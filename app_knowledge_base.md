@@ -157,12 +157,28 @@ Open app
   → parse saved JSON if present
   → merge/migrate state
   → otherwise create version-2 default state
+  → if onboarding is incomplete, ask for the user's name
+  → trim and save the required name
   → render Home
   → start future reminder timers for the current day
   → persist subsequent changes after a 120 ms debounce
 ```
 
 If saved JSON cannot be parsed, it is treated as missing and a new default state is created. The invalid stored value is not explicitly deleted, but the freshly initialized state will be persisted after a subsequent state change.
+
+### Name onboarding
+
+First-time users see a dedicated full-screen onboarding step after storage initialization and before the main app shell. The screen:
+
+- Asks “What should we call you?”
+- Provides one autofocused name field.
+- Requires a non-whitespace name before “Let's begin” is enabled.
+- Accepts Enter as a submission shortcut.
+- Trims leading and trailing whitespace before saving.
+- Marks onboarding complete and immediately renders Home.
+- Explains that the name can be changed later in Settings.
+
+Older saved states that do not contain the new `onboardingComplete` field are treated as not yet onboarded. Their existing profile name is prefilled so they can confirm or replace it without losing other app data.
 
 ## 5. Persistence and storage fallback
 
@@ -227,6 +243,7 @@ Conceptual schema:
 ```js
 {
   version: 2,
+  onboardingComplete: boolean,
   profile: {
     name: string,
     createdAt: ISODateTimeString
@@ -481,7 +498,8 @@ Changing a theme sets `data-theme` on the root HTML element and updates the brow
 
 ### Default profile and goals
 
-- Name: Saakshi
+- Name: blank until onboarding
+- Onboarding complete: false
 - Theme: Paper
 - ByWitness published posts per week: 3
 - ByWitness focus hours per week: 7
@@ -549,6 +567,7 @@ Migration behavior:
 - The state version becomes 2.
 - Default top-level state is shallow-merged with saved state.
 - Settings receive an additional nested merge, so missing settings inherit current defaults.
+- Saved states that do not contain `onboardingComplete` receive `false`, which routes them through name onboarding while preserving and prefilling their existing profile name.
 
 There is no migration path beyond version 2 yet.
 
@@ -586,6 +605,7 @@ Home is the default screen and the primary “what should I do now?” experienc
   - 17:00–21:59: “Good evening” 🌆
   - 22:00 onward: “Winding down” 🌙
 - Displays the profile name.
+- Combines the time-sensitive greeting and saved name into the personalized salutation, such as “Good morning, Aisha ☀️”.
 - Displays a deterministic daily greeting selected from a small phrase bank.
 - Profile avatar shows the first character of the current name and opens Settings.
 - The clock refreshes every 20 seconds.
@@ -1362,6 +1382,7 @@ If the bundle is reconstructed into maintainable source, the current behavior na
 
 ### Screens
 
+- `OnboardingScreen`
 - `HomeScreen`
 - `TimetableScreen`
 - `TrackerScreen`
