@@ -1,6 +1,6 @@
-// Tiny Wins service worker — cache the shell, serve it offline.
-const CACHE = 'tiny-wins-v1'
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png']
+// Tiny Wins service worker — keep the app current while preserving offline access.
+const CACHE = 'tiny-wins-v2'
+const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png']
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()))
@@ -14,6 +14,24 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return
+
+  // Always check the network for page navigations. Cache-first navigation kept
+  // returning an old deployment even after a newer version was available.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put('./index.html', copy)).catch(() => {})
+          }
+          return res
+        })
+        .catch(() => caches.match('./index.html')),
+    )
+    return
+  }
+
   e.respondWith(
     caches.match(e.request).then(
       (hit) =>

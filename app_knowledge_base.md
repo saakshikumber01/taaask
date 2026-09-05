@@ -31,7 +31,7 @@ The app combines several related tools:
 - Local backup, restore, and reset.
 - Installable/offline PWA behavior.
 
-The current defaults are personalized for a user named **Saakshi** and for a creative project called **ByWitness**.
+The first-run onboarding asks for the user's name. The default creative-project terminology is **ByWitness**.
 
 ### Product tone
 
@@ -1170,11 +1170,10 @@ Service workers still require a browser secure context; localhost is treated as 
 
 ### Cache strategy
 
-Cache name: `tiny-wins-v1`.
+Cache name: `tiny-wins-v2`.
 
 Install pre-caches:
 
-- `./`
 - `./index.html`
 - `./manifest.json`
 - `./icon-192.png`
@@ -1184,7 +1183,15 @@ The maskable icon is not explicitly pre-cached.
 
 On activation, all caches with other names are deleted and the worker immediately claims clients.
 
-For every GET request:
+For page-navigation GET requests:
+
+1. Fetch the current page from the network.
+2. If the response succeeds, update the cached `./index.html` fallback.
+3. If the network fails, return cached `./index.html` for offline use.
+
+This network-first navigation rule prevents an old deployment from being returned indefinitely.
+
+For other GET requests:
 
 1. Return a cached response if one exists.
 2. Otherwise fetch from the network.
@@ -1195,11 +1202,11 @@ Non-GET requests are ignored by the service worker.
 
 ### Offline/deployment caveats
 
-- The cache is cache-first with a fixed version string. Updating the app without changing `tiny-wins-v1` may leave old HTML cached indefinitely.
-- In a Vite production build, `index.html` points to a hashed JS asset. Old cached HTML may reference a removed old hash after deployment.
+- Navigation is network-first, so an available deployment replaces the cached HTML; offline navigation falls back to the latest successfully cached `index.html`.
+- The `tiny-wins-v2` version change removes the previous `tiny-wins-v1` cache on activation.
 - The JS asset is not in the explicit install list; it becomes cached after the first successful page load.
 - The fallback returns HTML for any failed GET, including requests that expected another content type.
-- Fetched responses are cached without checking `response.ok`.
+- Non-navigation fetched responses are cached without checking `response.ok`.
 - Registering this production-style service worker during Vite development can cache development resources and make changes appear stale. Clearing site data or unregistering the service worker may be required while developing.
 
 ## 25. UI and interaction system
@@ -1334,7 +1341,7 @@ The Plan screen is the main read-only aggregation surface. It combines routine, 
 2. **No URL routing** — refresh always returns Home; screens cannot be deep-linked or bookmarked.
 3. **Notifications are foreground timers** — reminders are not reliable background alarms.
 4. **Nudges setting is not wired** — `settings.notifications` is displayed and mutated but not checked by the scheduler.
-5. **Service-worker cache can become stale** — fixed cache version plus cache-first HTML is unsafe for repeated deployments.
+5. **Broad asset fallback** — a failed non-navigation GET can receive cached HTML even when another content type was expected.
 6. **Development service-worker interference** — the worker may cache Vite development resources.
 7. **Published editor inconsistency** — selecting Published in the editor does not create `publishedAt`.
 8. **New routine default uses legacy category** — new items default to `life`, which visually falls back to Break.
@@ -1533,6 +1540,6 @@ Because `index.html` contains generated/minified React and CSS:
 
 ## 33. Summary of the app's operating model
 
-Tiny Wins is one local state object viewed through several focused screens. The recurring routine defines what is expected; daily logs record what happened; specialized trackers record movement, focus, posting, sleep, eyes, and mood; plans attach intentions to dates; weekly/monthly calculations transform those records into gentle feedback. All of it is stored locally, and the PWA layer makes the already-loaded app available offline.
+Tiny Wins is one local state object viewed through several focused screens. The recurring routine defines what is expected; daily logs record what happened; specialized trackers record movement, focus, posting, sleep, eyes, and mood; plans attach intentions to dates; weekly/monthly calculations transform those records into gentle feedback. All of it is stored locally, and the PWA layer keeps navigation current when online while making the already-loaded app available offline.
 
-The app is functionally rich despite having no backend. Its most important technical risks are not missing functionality but maintainability and reliability: only a compiled bundle is available, notification scheduling is foreground-only, some settings/actions are inconsistently connected, and the service-worker update strategy can serve stale builds. Any continued development should preserve the privacy-first, low-pressure product voice while reconstructing a modular source tree and adding tests around the date, metric, persistence, and notification rules documented here.
+The app is functionally rich despite having no backend. Its most important technical risks are not missing functionality but maintainability and reliability: only a compiled bundle is available, notification scheduling is foreground-only, and some settings/actions are inconsistently connected. Any continued development should preserve the privacy-first, low-pressure product voice while reconstructing a modular source tree and adding tests around the date, metric, persistence, and notification rules documented here.
